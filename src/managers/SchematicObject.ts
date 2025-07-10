@@ -115,21 +115,22 @@ export class SchematicObject extends EventEmitter {
 		);
 
 		const schemBounds = this.getSchematicBounds();
+		const dimensions = this.getDimensions();
 
 		if (properties?.meshBoundingBox) {
 			this.meshBoundingBox = properties.meshBoundingBox;
 		} else {
 			this.meshBoundingBox = [
-				[schemBounds[0][0], schemBounds[0][1], schemBounds[0][2]],
-				[schemBounds[1][0], schemBounds[1][1], schemBounds[1][2]],
+				[0,0,0],
+				[dimensions[0], dimensions[1], dimensions[2]]
 			];
 		}
 
 		// Initialize rendering bounds to the full schematic dimensions
 		// But they are disabled by default (they won't be used for culling unless explicitly enabled)
 		this.renderingBounds = {
-			min: new THREE.Vector3(schemBounds[0][0], schemBounds[0][1], schemBounds[0][2]),
-			max: new THREE.Vector3(schemBounds[1][0], schemBounds[1][1], schemBounds[1][2]),
+			min: new THREE.Vector3(0,0,0),
+			max: new THREE.Vector3(dimensions[0], dimensions[1], dimensions[2]),
 			enabled: false, // Disabled by default
 		};
 
@@ -1678,5 +1679,13 @@ export class SchematicObject extends EventEmitter {
 		};
 
 		return settings;
+	}
+
+	public setScale(scale: THREE.Vector3 | number[]): void {
+		if (Array.isArray(scale)) {
+			this.scale = new THREE.Vector3(scale[0], scale[1], scale[2]);
+			return;
+		}
+		this.scale = scale;
 	}
 }
