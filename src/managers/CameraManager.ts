@@ -1401,7 +1401,7 @@ export class CameraManager extends EventEmitter {
 		const smallestDimension = Math.min(objectSize.x, objectSize.y, objectSize.z);
 		const largestDimension = Math.max(objectSize.x, objectSize.y, objectSize.z);
 
-		if ((smallestDimension <= 2 && largestDimension > smallestDimension) || largestDimension > smallestDimension * 4) {
+		if (smallestDimension <= 2 && largestDimension > smallestDimension) {
 			if (objectSize.x === smallestDimension) {
 				xzAngle = Math.PI / 2; // Look straight down the Y-axis
 				elevation = 10 * (THREE.MathUtils.DEG2RAD); // Slightly above horizontal
