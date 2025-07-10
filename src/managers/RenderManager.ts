@@ -369,10 +369,25 @@ export class RenderManager {
 			this.renderer.setSize(width, height, false);
 			this.composer.setSize(width, height);
 
-			const camera = this.schematicRenderer.cameraManager.activeCamera
-				.camera as THREE.PerspectiveCamera;
-			camera.aspect = width / height;
-			camera.updateProjectionMatrix();
+			if (!this.isOrthographicCamera()) {
+				const camera = this.schematicRenderer.cameraManager.activeCamera
+					.camera as THREE.PerspectiveCamera;
+				camera.aspect = width / height;
+				camera.updateProjectionMatrix();
+			} else{
+				const camera = this.schematicRenderer.cameraManager.activeCamera
+					.camera as THREE.OrthographicCamera;
+				const frustumHeight =
+					camera.top - camera.bottom; // Preserve current height
+				//const frustumWidth = camera.right - camera.left; // Preserve current width
+				const aspect = width / height;
+
+				camera.left = (-frustumHeight * aspect) / 2;
+				camera.right = (frustumHeight * aspect) / 2;
+				// cameraWrapper.camera.top = frustumHeight / 2; // Already set
+				// cameraWrapper.camera.bottom = -frustumHeight / 2; // Already set
+				camera.updateProjectionMatrix();
+			}
 
 			const ssaoPass = this.passes.get("ssao");
 			if (ssaoPass && ssaoPass.setSize) {
@@ -380,6 +395,7 @@ export class RenderManager {
 				ssaoPass.setSize(width * dpr, height * dpr);
 			}
 		}
+		this.eventEmitter.emit("canvasResized", { width, height });
 	}
 
 	public enableEffect(effectName: string): void {

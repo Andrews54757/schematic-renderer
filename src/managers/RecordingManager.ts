@@ -31,6 +31,10 @@ export class RecordingManager {
 		height: number;
 		pixelRatio: number;
 		aspect: number;
+		left: number;
+		right: number;
+		top: number;
+		bottom: number;
 	} | null = null;
 
 	constructor(schematicRenderer: SchematicRenderer) {
@@ -99,7 +103,7 @@ export class RecordingManager {
 	public async takeScreenshot(options: ScreenshotOptions = {}): Promise<Blob> {
 		const {
 			width = this.schematicRenderer.renderManager?.renderer.domElement.width ||
-				3840,
+			3840,
 			height = this.schematicRenderer.renderManager?.renderer.domElement
 				.height || 2160,
 			quality = 0.9,
@@ -129,14 +133,18 @@ export class RecordingManager {
 		const renderer = this.schematicRenderer.renderManager?.renderer;
 		if (!renderer) throw new Error("Renderer not found");
 		const camera = this.schematicRenderer.cameraManager.activeCamera
-			.camera as THREE.PerspectiveCamera;
+			.camera;
 
 		// Store current settings
 		const tempSettings = {
 			width: renderer.domElement.width,
 			height: renderer.domElement.height,
 			pixelRatio: renderer.getPixelRatio(),
-			aspect: camera.aspect,
+			aspect: (camera as any).aspect,
+			left: (camera as any).left,
+			right: (camera as any).right,
+			top: (camera as any).top,
+			bottom: (camera as any).bottom,
 		};
 
 		// Apply new settings
@@ -144,8 +152,23 @@ export class RecordingManager {
 		this.recordingCanvas.height = height;
 		renderer.setPixelRatio(1.0);
 		renderer.setSize(width, height, false);
-		camera.aspect = width / height;
-		camera.updateProjectionMatrix();
+
+		const aspect = width / height;
+		if (camera instanceof THREE.PerspectiveCamera) {
+			camera.aspect = aspect;
+			camera.updateProjectionMatrix();
+		} else if (camera instanceof THREE.OrthographicCamera) {
+			// When aspect ratio changes, orthographic cameras need their frustum recalculated
+			// to maintain proper framing if focusOnSchematics was called.
+			// For now, just update using a fixed frustum size, but ideally, it should re-focus.
+			const frustumHeight =
+				camera.top - camera.bottom; // Preserve current height
+			camera.left = (-frustumHeight * aspect) / 2;
+			camera.right = (frustumHeight * aspect) / 2;
+			// cameraWrapper.camera.top = frustumHeight / 2; // Already set
+			// cameraWrapper.camera.bottom = -frustumHeight / 2; // Already set
+			camera.updateProjectionMatrix();
+		}
 
 		return tempSettings;
 	}
@@ -153,18 +176,30 @@ export class RecordingManager {
 	private restoreSettings(settings: {
 		width: number;
 		height: number;
+		left: number;
+		right: number;
+		top: number;
+		bottom: number;
 		pixelRatio: number;
 		aspect: number;
 	}): void {
 		const renderer = this.schematicRenderer.renderManager?.renderer;
 		if (!renderer) throw new Error("Renderer not found");
 		const camera = this.schematicRenderer.cameraManager.activeCamera
-			.camera as THREE.PerspectiveCamera;
+			.camera;
 
 		renderer.setSize(settings.width, settings.height, false);
 		renderer.setPixelRatio(settings.pixelRatio);
-		camera.aspect = settings.aspect;
-		camera.updateProjectionMatrix();
+		if (camera instanceof THREE.PerspectiveCamera) {
+			camera.aspect = settings.aspect;
+			camera.updateProjectionMatrix();
+		} else if (camera instanceof THREE.OrthographicCamera) {
+			camera.left = settings.left;
+			camera.right = settings.right;
+			camera.top = settings.top;
+			camera.bottom = settings.bottom;
+			camera.updateProjectionMatrix();
+		}
 	}
 
 	private async setupRecording(width: number, height: number): Promise<void> {
@@ -175,21 +210,34 @@ export class RecordingManager {
 		const renderer = this.schematicRenderer.renderManager?.renderer;
 		if (!renderer) throw new Error("Renderer not found");
 		const camera = this.schematicRenderer.cameraManager.activeCamera
-			.camera as THREE.PerspectiveCamera;
+			.camera;
 
 		this.originalSettings = {
 			width: renderer.domElement.clientWidth,
 			height: renderer.domElement.clientHeight,
 			pixelRatio: renderer.getPixelRatio(),
-			aspect: camera.aspect,
+			aspect: (camera as any).aspect,
+			left: (camera as any).left,
+			right: (camera as any).right,
+			top: (camera as any).top,
+			bottom: (camera as any).bottom,
 		};
 
 		this.recordingCanvas.width = width;
 		this.recordingCanvas.height = height;
 		renderer.setPixelRatio(1.0);
 		renderer.setSize(width, height, false);
-		camera.aspect = width / height;
-		camera.updateProjectionMatrix();
+		if (camera instanceof THREE.PerspectiveCamera) {
+			camera.aspect = width / height;
+			camera.updateProjectionMatrix();
+		} else if (camera instanceof THREE.OrthographicCamera) {
+			// When aspect ratio changes, orthographic cameras need their frustum recalculated
+			const frustumHeight =
+				camera.top - camera.bottom; // Preserve current height
+			camera.left = (-frustumHeight * (width / height)) / 2;
+			camera.right = (frustumHeight * (width / height)) / 2;
+			camera.updateProjectionMatrix();
+		}
 	}
 
 	// @ts-ignore
@@ -347,15 +395,26 @@ export class RecordingManager {
 			const renderer = this.schematicRenderer.renderManager?.renderer;
 			if (!renderer) throw new Error("Renderer not found");
 			const camera = this.schematicRenderer.cameraManager.activeCamera
-				.camera as THREE.PerspectiveCamera;
+				.camera;
 			renderer.setSize(
 				this.originalSettings.width,
 				this.originalSettings.height,
 				false
 			);
 			renderer.setPixelRatio(this.originalSettings.pixelRatio);
-			camera.aspect = this.originalSettings.aspect;
-			camera.updateProjectionMatrix();
+			// camera.aspect = this.originalSettings.aspect;
+			// camera.updateProjectionMatrix();
+			if (camera instanceof THREE.PerspectiveCamera) {
+				camera.aspect = this.originalSettings.aspect;
+				camera.updateProjectionMatrix();
+			} else if (camera instanceof THREE.OrthographicCamera) {
+				camera.left = this.originalSettings.left;
+				camera.right = this.originalSettings.right;
+				camera.top = this.originalSettings.top;
+				camera.bottom = this.originalSettings.bottom;
+				camera.updateProjectionMatrix();
+			}
+
 			this.originalSettings = null;
 		}
 	}

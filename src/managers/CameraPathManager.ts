@@ -212,8 +212,8 @@ export class CameraPathManager {
 		const testHeights = [
 			sphereRadius * 0.3, // Low angle
 			sphereRadius * 0.6, // Medium angle
-			sphereRadius * 1.0, // High angle
-			sphereRadius * 1.5, // Very high angle
+		//	sphereRadius * 1.0, // High angle
+		//	sphereRadius * 1.5, // Very high angle
 		];
 
 		let bestRadius = optimalRadius;

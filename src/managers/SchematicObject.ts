@@ -107,41 +107,29 @@ export class SchematicObject extends EventEmitter {
 		// Set initial properties if provided
 		Object.assign(this, properties);
 
-		const schematicDimensions = this.getDimensions();
-		console.log("Schematic dimensions:", schematicDimensions);
+		//console.log("Schematic dimensions:", schematicDimensions);
 		this.position = new THREE.Vector3(
-			-schematicDimensions[0] / 2 + 0.5, // Center the schematic
 			0,
-			-schematicDimensions[2] / 2 + 0.5 // Center the schematic
+			0,
+			0
 		);
+
+		const schemBounds = this.getSchematicBounds();
 
 		if (properties?.meshBoundingBox) {
 			this.meshBoundingBox = properties.meshBoundingBox;
 		} else {
 			this.meshBoundingBox = [
-				this.position.toArray(),
-				this.position
-					.clone()
-					.add(
-						new THREE.Vector3(
-							schematicDimensions[0],
-							schematicDimensions[1],
-							schematicDimensions[2]
-						)
-					)
-					.toArray(),
+				[schemBounds[0][0], schemBounds[0][1], schemBounds[0][2]],
+				[schemBounds[1][0], schemBounds[1][1], schemBounds[1][2]],
 			];
 		}
 
 		// Initialize rendering bounds to the full schematic dimensions
 		// But they are disabled by default (they won't be used for culling unless explicitly enabled)
 		this.renderingBounds = {
-			min: new THREE.Vector3(0, 0, 0),
-			max: new THREE.Vector3(
-				schematicDimensions[0],
-				schematicDimensions[1],
-				schematicDimensions[2]
-			),
+			min: new THREE.Vector3(schemBounds[0][0], schemBounds[0][1], schemBounds[0][2]),
+			max: new THREE.Vector3(schemBounds[1][0], schemBounds[1][1], schemBounds[1][2]),
 			enabled: false, // Disabled by default
 		};
 
@@ -1026,10 +1014,10 @@ export class SchematicObject extends EventEmitter {
 	 * Resets the rendering bounds to include the full schematic
 	 */
 	public resetRenderingBounds(): void {
-		const dimensions = this.getDimensions();
+		const bounds = this.getSchematicBounds();
 		this.setRenderingBounds(
-			new THREE.Vector3(0, 0, 0),
-			new THREE.Vector3(dimensions[0], dimensions[1], dimensions[2])
+			new THREE.Vector3(bounds[0][0], bounds[0][1], bounds[0][2]),
+			new THREE.Vector3(bounds[1][0], bounds[1][1], bounds[1][2])
 		);
 	}
 
@@ -1174,7 +1162,7 @@ export class SchematicObject extends EventEmitter {
 			position = new THREE.Vector3(position[0], position[1], position[2]);
 		}
 
-		this.schematicWrapper.set_block_from_string(
+		this.schematicWrapper.set_block(
 			position.x,
 			position.y,
 			position.z,
@@ -1443,16 +1431,9 @@ export class SchematicObject extends EventEmitter {
 
 	public containsPosition(position: THREE.Vector3): boolean {
 		// Calculate the bounds of the schematic
-		const dimensions = this.getDimensions();
-		const min = this.position.clone();
-		const max = min
-			.clone()
-			.add(
-				new THREE.Vector3(dimensions[0], dimensions[1], dimensions[2]).multiply(
-					this.scale
-				)
-			);
-
+		const bounds = this.getBoundingBox();
+		const min = new THREE.Vector3(bounds[0][0], bounds[0][1], bounds[0][2]);
+		const max = new THREE.Vector3(bounds[1][0], bounds[1][1], bounds[1][2]);
 		return (
 			position.x >= min.x &&
 			position.x <= max.x &&
@@ -1464,11 +1445,12 @@ export class SchematicObject extends EventEmitter {
 	}
 
 	public getSchematicCenter(): THREE.Vector3 {
-		const dimensions = this.getDimensions();
+		const bounds = this.getSchematicBounds();
+
 		return new THREE.Vector3(
-			this.position.x + Math.abs(dimensions[0] / 2),
-			this.position.y + Math.abs(dimensions[1] / 2),
-			this.position.z + Math.abs(dimensions[2] / 2)
+			(bounds[0][0] + bounds[1][0]) / 2,
+			(bounds[0][1] + bounds[1][1]) / 2,
+			(bounds[0][2] + bounds[1][2]) / 2
 		);
 	}
 
@@ -1512,23 +1494,23 @@ export class SchematicObject extends EventEmitter {
 		this.rotation = rotation;
 	}
 
-	public setScale(scale: THREE.Vector3 | number[]): void {
-		if (Array.isArray(scale)) {
-			this.scale = new THREE.Vector3(scale[0], scale[1], scale[2]);
-			return;
-		}
-		this.scale = scale;
-	}
-
 	public getWorldPosition(): THREE.Vector3 {
 		return this.group.getWorldPosition(new THREE.Vector3());
 	}
 
+	private getSchematicBounds(): [number[], number[]] {
+		const bounds = this.schematicWrapper.get_bounding_box();
+		return [
+			[bounds[0], bounds[1], bounds[2]],
+			[bounds[3], bounds[4], bounds[5]],
+		];
+	}
+	 
 	public getBoundingBox(): [number[], number[]] {
-		const boundingBox = this.getDimensions();
+		const schematicBounds = this.getSchematicBounds();
 		const positionArray = this.position.toArray();
-		const min = positionArray;
-		const max = positionArray.map((v, i) => v + boundingBox[i]);
+		const min = schematicBounds[0].map((v, i) => v + positionArray[i]);
+		const max = schematicBounds[1].map((v, i) => v + positionArray[i]);
 		return [min, max];
 	}
 

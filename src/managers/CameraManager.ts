@@ -66,7 +66,6 @@ type CameraType = "perspective" | "orthographic";
 type ControlType = "orbit" | "creative" | "none";
 
 // Define constants for minimums to avoid magic numbers and allow easier tuning
-const ABSOLUTE_MIN_ORTHO_VISIBLE_HEIGHT = 5; // Minimum world units for orthographic camera's visible height
 const ABSOLUTE_MIN_PERSPECTIVE_DISTANCE = 5; // Minimum world units for perspective camera's distance from target
 
 export class CameraManager extends EventEmitter {
@@ -95,7 +94,7 @@ export class CameraManager extends EventEmitter {
 		isometric: {
 			type: "orthographic" as const,
 			position: [0, 0, 20] as const, // Initial position
-			rotation: [(-36 * Math.PI) / 180, (135 * Math.PI) / 180, 0] as const, // Their default angles: 36° slant, 135° rotation
+			rotation: [(36 * Math.PI) / 180, (135 * Math.PI) / 180, 0] as const, // Their default angles: 36° slant, 135° rotation
 			controlType: "orbit" as const,
 			fov: 45, // FOV for orthographic camera
 			controlSettings: {
@@ -105,8 +104,8 @@ export class CameraManager extends EventEmitter {
 				enableZoom: true,
 				enableRotate: true,
 				enablePan: true,
-				minPolarAngle: Math.PI / 4, // 45 degrees
-				maxPolarAngle: Math.PI * 0.4, // ~72 degrees
+				// minPolarAngle: Math.PI / 4, // 45 degrees
+				// maxPolarAngle: Math.PI * 0.4, // ~72 degrees
 			},
 		},
 		perspective: {
@@ -157,7 +156,7 @@ export class CameraManager extends EventEmitter {
 		const defaultPresetName = options.defaultCameraPreset || "perspective";
 		const defaultPreset =
 			CameraManager.CAMERA_PRESETS[
-				defaultPresetName as keyof typeof CameraManager.CAMERA_PRESETS
+			defaultPresetName as keyof typeof CameraManager.CAMERA_PRESETS
 			] || CameraManager.CAMERA_PRESETS.perspective;
 		this.activeControlKey = `${defaultPresetName}-${defaultPreset.controlType}`;
 
@@ -208,7 +207,7 @@ export class CameraManager extends EventEmitter {
 		}
 		const initialPreset =
 			CameraManager.CAMERA_PRESETS[
-				this.activeCameraKey as keyof typeof CameraManager.CAMERA_PRESETS
+			this.activeCameraKey as keyof typeof CameraManager.CAMERA_PRESETS
 			];
 		this.activeControlKey = `${this.activeCameraKey}-${initialPreset.controlType}`;
 
@@ -426,7 +425,7 @@ export class CameraManager extends EventEmitter {
 	public switchCameraPreset(presetName: string): void {
 		const preset =
 			CameraManager.CAMERA_PRESETS[
-				presetName as keyof typeof CameraManager.CAMERA_PRESETS
+			presetName as keyof typeof CameraManager.CAMERA_PRESETS
 			];
 		if (!preset) {
 			console.warn(`Preset ${presetName} not found`);
@@ -558,8 +557,8 @@ export class CameraManager extends EventEmitter {
 		controls.enablePan = true;
 
 		// Restrict vertical rotation to maintain isometric feel
-		controls.minPolarAngle = Math.PI / 4; // 45 degrees
-		controls.maxPolarAngle = Math.PI / 2.5; // ~72 degrees
+		// controls.minPolarAngle = Math.PI / 4; // 45 degrees
+		// controls.maxPolarAngle = Math.PI / 2.5; // ~72 degrees
 	}
 
 	public update(deltaTime: number = 0) {
@@ -649,7 +648,7 @@ export class CameraManager extends EventEmitter {
 		}
 
 		const {
-			padding = 0.15, // 15% padding by default
+			padding = 0.05, // 5% padding by default
 			animationDuration = 0,
 			easing = (t: number) => t * t * (3.0 - 2.0 * t), // smooth step
 			skipPathFitting = false,
@@ -700,12 +699,7 @@ export class CameraManager extends EventEmitter {
 
 			// Update orthographic camera size for optimal framing
 			const orthoCamera = this.activeCamera.camera as THREE.OrthographicCamera;
-			const requiredFrustumHeight = this.calculateOrthographicSize(
-				size,
-				aspect,
-				padding
-			);
-
+			const requiredFrustumHeight = result.height;
 			orthoCamera.left = (-requiredFrustumHeight * aspect) / 2;
 			orthoCamera.right = (requiredFrustumHeight * aspect) / 2;
 			orthoCamera.top = requiredFrustumHeight / 2;
@@ -793,35 +787,6 @@ export class CameraManager extends EventEmitter {
 			// If it's an initial load without zoom, and auto-orbit is generally enabled
 			setTimeout(() => this.startAutoOrbitFromOptimalPosition(), 100);
 		}
-	}
-
-	/**
-	 * Calculate optimal orthographic camera size
-	 */
-	private calculateOrthographicSize(
-		objectSize: THREE.Vector3,
-		aspect: number,
-		padding: number
-	): number {
-		const paddingFactor = 1 + padding * 2; // e.g., 1.3 for 15% padding on each side
-
-		// Calculate the effective width and height of the object including padding
-		const paddedObjectWidth = objectSize.x * paddingFactor;
-		const paddedObjectHeight = objectSize.y * paddingFactor;
-
-		// Determine the orthographic camera's required frustum height.
-		// This depends on whether the object's padded width (scaled by aspect) or padded height is larger.
-		let requiredFrustumHeight;
-		if (paddedObjectWidth / aspect > paddedObjectHeight) {
-			// Width is the constraining dimension relative to viewport proportions
-			requiredFrustumHeight = paddedObjectWidth / aspect;
-		} else {
-			// Height is the constraining dimension
-			requiredFrustumHeight = paddedObjectHeight;
-		}
-
-		// Ensure a minimum visible height to prevent extreme zoom on very small objects.
-		return Math.max(requiredFrustumHeight, ABSOLUTE_MIN_ORTHO_VISIBLE_HEIGHT);
 	}
 
 	/**
@@ -933,7 +898,6 @@ export class CameraManager extends EventEmitter {
 			await this.focusOnSchematics({
 				// This will fit the path
 				animationDuration: 0,
-				padding: 0.15,
 				skipPathFitting: false, // Ensure path is fitted
 			});
 			// focusOnSchematics now handles starting orbit if it was previously enabled or if options dictate it
@@ -1103,11 +1067,7 @@ export class CameraManager extends EventEmitter {
 			finalTargetRotation = result.rotation;
 			// Also update ortho camera projection for the final state
 			const orthoCamera = this.activeCamera.camera as THREE.OrthographicCamera;
-			const requiredFrustumHeight = this.calculateOrthographicSize(
-				size,
-				aspect,
-				padding
-			);
+			const requiredFrustumHeight = result.height;
 			orthoCamera.left = (-requiredFrustumHeight * aspect) / 2;
 			orthoCamera.right = (requiredFrustumHeight * aspect) / 2;
 			orthoCamera.top = requiredFrustumHeight / 2;
@@ -1409,8 +1369,9 @@ export class CameraManager extends EventEmitter {
 		const finalDistance = Math.max(calculatedDistance, minDistanceFloor);
 
 		// Position camera at a common viewing angle (e.g., 45 degrees offset in XZ, 30 degrees up)
-		const offsetAngleXY = Math.PI / 4; // 45 degrees
-		const elevationAngle = Math.PI / 6; // 30 degrees
+
+		let offsetAngleXY = Math.PI / 4; // 45 degrees
+		let elevationAngle = Math.PI / 6; // 30 degrees
 
 		const camOffset = new THREE.Vector3(
 			Math.cos(elevationAngle) * Math.sin(offsetAngleXY), // X component
@@ -1432,34 +1393,100 @@ export class CameraManager extends EventEmitter {
 		aspect: number,
 		// @ts-ignore padding is used by calculateOrthographicSize called from focusOnSchematics
 		padding: number
-	): { position: THREE.Vector3; rotation: THREE.Euler } {
-		const presetName = this.activeCameraKey; // Assume current active camera is isometric or similar ortho
-		const preset =
-			CameraManager.CAMERA_PRESETS[
-				presetName as keyof typeof CameraManager.CAMERA_PRESETS
-			] || CameraManager.CAMERA_PRESETS.isometric;
+	): { position: THREE.Vector3; rotation: THREE.Euler, height: number } {
+		let elevation = (20 * Math.PI) / 180; // 20 degrees
+		let xzAngle = ((90 + 45) * Math.PI) / 180; // 45 degrees
 
-		// Use preset rotation if available, otherwise a default isometric-like rotation
-		const rotationArray =
-			preset.rotation || CameraManager.CAMERA_PRESETS.isometric.rotation;
-		const rotation = new THREE.Euler(...rotationArray);
+		// Handle slices
+		const smallestDimension = Math.min(objectSize.x, objectSize.y, objectSize.z);
+		const largestDimension = Math.max(objectSize.x, objectSize.y, objectSize.z);
 
-		// Position the camera far enough along its viewing vector.
-		// Distance is based on the object's largest dimension to ensure it's outside the object.
-		const maxObjectDim = Math.max(objectSize.x, objectSize.y, objectSize.z);
-		// Safety factor to ensure camera is well outside the object.
-		// Padding is already accounted for in ortho frustum size.
-		const distanceFactor =
-			maxObjectDim * 1.5 + ABSOLUTE_MIN_ORTHO_VISIBLE_HEIGHT * 2;
+		if ((smallestDimension <= 2 && largestDimension > smallestDimension) || largestDimension > smallestDimension * 4) {
+			if (objectSize.x === smallestDimension) {
+				xzAngle = Math.PI / 2; // Look straight down the Y-axis
+				elevation = 10 * (THREE.MathUtils.DEG2RAD); // Slightly above horizontal
+			} else if (objectSize.z === smallestDimension) {
+				xzAngle = 0; // Look from the side
+				elevation = 10 * (THREE.MathUtils.DEG2RAD); // Slightly above horizontal
+			} else if (objectSize.y === smallestDimension) {
+				xzAngle = 0; // Look straight down the XZ plane
+				elevation = 80 * (THREE.MathUtils.DEG2RAD); // Directly above
+			}
+		}
 
-		// Create a vector pointing away from the object along the camera's negative Z-axis (local)
+		const rotation = new THREE.Euler(-elevation, xzAngle, 0, 'YXZ');
+		const viewMatrix = new THREE.Matrix4().makeRotationFromEuler(rotation).invert(); // world→view
+
+		/* ------------------------------------------------------------------ */
+		/* 1–2.  Build the 8 corners and transform them into view-space.      */
+		/* ------------------------------------------------------------------ */
+		const half = objectSize.clone().multiplyScalar(0.5);
+		const corners: THREE.Vector3[] = [];
+		for (let dx of [-half.x, half.x]) {
+			for (let dy of [-half.y, half.y]) {
+				for (let dz of [-half.z, half.z]) {
+					const worldCorner = new THREE.Vector3(
+						center.x + dx,
+						center.y + dy,
+						center.z + dz
+					);
+					corners.push(worldCorner.applyMatrix4(viewMatrix));
+				}
+			}
+		}
+
+		/* ------------------------------------------------------------------ */
+		/* 3.  Find the projected 2-D extents in view-space (x→right, y→up).  */
+		/* ------------------------------------------------------------------ */
+		let minX = Infinity, maxX = -Infinity,
+			minY = Infinity, maxY = -Infinity,
+			minZ = Infinity, maxZ = -Infinity;
+
+		for (const v of corners) {
+			minX = Math.min(minX, v.x); maxX = Math.max(maxX, v.x);
+			minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y);
+			minZ = Math.min(minZ, v.z); maxZ = Math.max(maxZ, v.z);
+		}
+
+		// console.log(
+		// 	"Isometric camera bounds in view space:",
+		// 	`X: ${maxX - }
+		// );
+
+		const width = maxX - minX;
+		const height = maxY - minY;
+
+		/* ------------------------------------------------------------------ */
+		/* 4.  Expand by padding and map to an ortho half-height.             */
+		/* ------------------------------------------------------------------ */
+		const padFactor = 1 + padding; // padding on both sides
+		const paddedW = width * padFactor;
+		const paddedH = height * padFactor;
+
+		// The orthographic frustum is defined by ±halfHeight in Y,
+		// and ±halfHeight*aspect in X.  Use whichever extent dominates.
+		let halfHeight = paddedH * 0.5;
+		if (paddedW / aspect > paddedH) {
+			// Width is the constraining dimension relative to viewport proportions
+			halfHeight = paddedW / (2 * aspect);
+		}
+
+		/* ------------------------------------------------------------------ */
+		/* 5.  Choose a camera distance so every point is within near-far.    */
+		/* ------------------------------------------------------------------ */
+		const depth = maxZ - minZ;               // view-space depth of the box
+		const offset = (depth * 0.5) + objectSize.length() * 0.5;
+		//const viewDir = new THREE.Vector3(0, 0, -1).applyEuler(rotation); // forward (-Z) in world space
+
 		const offsetDirection = new THREE.Vector3(0, 0, 1); // Camera looks along -Z, so position along +Z from target
 		offsetDirection.applyEuler(rotation); // Rotate this direction by the camera's rotation
-		offsetDirection.multiplyScalar(distanceFactor);
-
+		offsetDirection.multiplyScalar(offset);
 		const position = center.clone().add(offsetDirection);
 
-		return { position, rotation };
+		//const position = center.clone().addScaledVector(viewDir.negate(), offset);
+		// console.log("Isometric camera position:", position, "rotation:", rotation, "halfHeight:", halfHeight);
+
+		return { position, rotation, height: halfHeight * 2 };
 	}
 
 	/**
